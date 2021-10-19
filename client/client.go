@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -34,6 +35,8 @@ func main() {
 	}
 	defer con.Close()
 
+	fmt.Println("Connected to the Key value store, please enter your commands")
+
 	clientReader := bufio.NewReader(os.Stdin)
 	serverReader := bufio.NewReader(con)
 
@@ -60,12 +63,12 @@ func main() {
 
 		switch err {
 		case nil:
-			log.Println(strings.TrimSpace(serverResponse))
+			fmt.Println(strings.TrimSpace(serverResponse))
 		case io.EOF:
-			log.Println("server closed the connection")
+			fmt.Println("server closed the connection")
 			return
 		default:
-			log.Printf("server error: %v\n", err)
+			fmt.Printf("server error: %v\n", err)
 			return
 		}
 	}
