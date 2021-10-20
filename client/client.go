@@ -4,36 +4,24 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"os"
 	"strings"
 )
 
-type ClientMetadata struct {
-	Owner          string
-	ChatServerHost string
-	ChatServerPort string
-	OwnerEmail     string
-}
-
-type Command struct {
-	operation string
-	operand1  interface{}
-	operand2  interface{}
-}
-
-var clientMD ClientMetadata
-var conn net.Conn
-var connectionC = make(chan net.Conn)
-var commands = make(chan Command)
-
 func main() {
 	con, err := net.Dial("tcp", "0.0.0.0:8080")
 	if err != nil {
-		log.Fatalln(err)
+		fmt.Printf("error while connecting to server: %s", err)
+		return
 	}
-	defer con.Close()
+
+	defer func(con net.Conn) {
+		err := con.Close()
+		if err != nil {
+			fmt.Printf("error while closing connection: %v\n", err)
+		}
+	}(con)
 
 	fmt.Println("Connected to the Key value store, please enter your commands")
 
@@ -46,15 +34,15 @@ func main() {
 
 		switch err {
 		case nil:
-			clientRequest := strings.TrimSpace(clientRequest)
+			clientRequest = strings.TrimSpace(clientRequest)
 			if _, err = con.Write([]byte(clientRequest + "\n")); err != nil {
-				log.Printf("failed to send the client request: %v \n", err)
+				fmt.Printf("failed to send the client request: %v \n", err)
 			}
 		case io.EOF:
-			log.Println("client closed the connection")
+			fmt.Println("client closed the connection")
 			return
 		default:
-			log.Printf("client error: %v\n", err)
+			fmt.Printf("client error: %v\n", err)
 			return
 		}
 
