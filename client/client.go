@@ -2,8 +2,10 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"io"
+	"keyvaluestore"
 	"net"
 	"os"
 	"strings"
@@ -35,7 +37,8 @@ func main() {
 		switch err {
 		case nil:
 			clientRequest = strings.TrimSpace(clientRequest)
-			if _, err = con.Write([]byte(clientRequest + "\n")); err != nil {
+
+			if _, err = con.Write(append(handleInput(clientRequest), []byte("\n")...)); err != nil {
 				fmt.Printf("failed to send the client request: %v \n", err)
 			}
 		case io.EOF:
@@ -60,4 +63,36 @@ func main() {
 			return
 		}
 	}
+}
+
+func handleInput(clientRequest string) []byte {
+	inputParams := strings.Split(clientRequest, " ")
+
+	if len(inputParams) > 3 || len(inputParams) < 2 {
+		fmt.Println("Invalid command")
+		return nil
+	}
+
+	var marshal []byte
+	var err error
+
+	if len(inputParams) == 3 {
+		marshal, err = json.Marshal(&keyvaluestore.Command{
+			Operation: inputParams[0],
+			Operand1:  inputParams[1],
+			Operand2:  inputParams[2],
+		})
+	} else {
+		marshal, err = json.Marshal(&keyvaluestore.Command{
+			Operation: inputParams[0],
+			Operand1:  inputParams[1],
+		})
+	}
+
+	if err != nil {
+		fmt.Println("Error marshalling input: ", err.Error())
+		return nil
+	}
+
+	return marshal
 }

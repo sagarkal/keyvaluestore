@@ -2,24 +2,19 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
-	"io"
+	"keyvaluestore"
 	"log"
 	"net"
 	"strings"
 )
 
-type command struct {
-	operation string
-	operand1  string
-	operand2  interface{}
-}
-
-var store map[string]interface{}
+var store map[interface{}]interface{}
 var result interface{}
 
 func main() {
-	store = make(map[string]interface{})
+	store = make(map[interface{}]interface{})
 
 	service := fmt.Sprintf("0.0.0.0:8080")
 	listener, err := net.Listen("tcp", service)
@@ -53,57 +48,50 @@ func handleConnection(con net.Conn) {
 
 	for {
 		// Waiting for the client
-		input, err := clientReader.ReadString('\n')
+		var input keyvaluestore.Command
+		rawInput, err := clientReader.ReadString('\n')
 
 		switch err {
 		case nil:
-			input = strings.TrimSpace(input)
-			if input == "quit" {
-				fmt.Println("closing the connection as requested by client")
-				return
-			} else {
-				fmt.Println("request received from client: ", input)
+			rawInput = strings.TrimSpace(rawInput)
+			err := json.Unmarshal([]byte(rawInput), &input)
+			if err != nil {
+				fmt.Printf("error while unmarshalling: ", err)
 			}
-		case io.EOF:
-			fmt.Println("client closed the connection by terminating the process")
-			return
+
+			fmt.Println("request received from client: ", input)
+
 		default:
 			fmt.Printf("error: %v\n", err)
 			return
 		}
 
-		if input != "" {
-			finalResult := processInput(input).(string) + "\n"
+		finalResult := processInput(input).(string) + "\n"
 
-			// Responding to the client request
-			if _, err = con.Write([]byte(finalResult)); err != nil {
-				log.Printf("failed to respond to client: %v\n", err)
-			}
-
-			fmt.Println("Response sent to the client!")
+		// Responding to the client request
+		if _, err = con.Write([]byte(finalResult)); err != nil {
+			log.Printf("failed to respond to client: %v\n", err)
 		}
+
+		fmt.Println("Response sent to the client!")
 
 	}
 }
 
-func processInput(input string) interface{} {
-	var cmd command
-	cmd.operation = strings.Split(input, " ")[0]
-	cmd.operand1 = strings.Split(input, " ")[1]
+func processInput(input keyvaluestore.Command) interface{} {
 
-	switch cmd.operation {
+	switch input.Operation {
 	case "SET":
-		cmd.operand2 = strings.Split(input, " ")[2]
-		store[cmd.operand1] = strings.TrimSpace(cmd.operand2.(string))
+		store[input.Operand1] = input.Operand2
 		result = "OK"
 	case "GET":
 		result = "nil"
-		if val, ok := store[strings.TrimSpace(cmd.operand1)]; ok {
+		if val, ok := store[input.Operand1]; ok {
 			result = val
 		}
 	case "DELETE":
-		result = store[strings.TrimSpace(cmd.operand1)]
-		delete(store, strings.TrimSpace(cmd.operand1))
+		result = store[input.Operand1]
+		delete(store, input.Operand1)
 
 	default:
 		result = "Unsupported command or Wrong Syntax! Please try again"
